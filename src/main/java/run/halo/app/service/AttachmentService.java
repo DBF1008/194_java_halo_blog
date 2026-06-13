@@ -11,6 +11,7 @@ import run.halo.app.model.dto.AttachmentDTO;
 import run.halo.app.model.entity.Attachment;
 import run.halo.app.model.enums.AttachmentType;
 import run.halo.app.model.params.AttachmentQuery;
+import run.halo.app.model.support.UrlReplaceModuleReport;
 import run.halo.app.service.base.CrudService;
 
 
@@ -84,11 +85,13 @@ public interface AttachmentService extends CrudService<Attachment, Integer> {
     List<AttachmentType> listAllType();
 
     /**
-     * Replace attachment url in batch.
+     * Replaces the blog url across all attachments.
      *
-     * @param oldUrl old blog url.
-     * @param newUrl new blog url.
-     * @return replaced attachments.
+     * @param oldUrl old blog url
+     * @param newUrl new blog url
+     * @param dryRun if true, only count occurrences without persisting any change
+     * @return a report describing the matched fields and occurrence counts
      */
-    List<Attachment> replaceUrl(@NonNull String oldUrl, @NonNull String newUrl);
+    UrlReplaceModuleReport replaceUrl(@NonNull String oldUrl, @NonNull String newUrl,
+        boolean dryRun);
 }

@@ -11,6 +11,7 @@ import run.halo.app.model.dto.post.BasePostMinimalDTO;
 import run.halo.app.model.dto.post.BasePostSimpleDTO;
 import run.halo.app.model.entity.BasePost;
 import run.halo.app.model.enums.PostStatus;
+import run.halo.app.model.support.UrlReplaceModuleReport;
 
 /**
  * Base post service implementation.
@@ -298,14 +299,16 @@ public interface BasePostService<POST extends BasePost> extends CrudService<POST
     List<POST> updateStatusByIds(@NonNull List<Integer> ids, @NonNull PostStatus status);
 
     /**
-     * Replace post blog url in batch.
+     * Replaces the blog url across all posts.
      *
-     * @param oldUrl old blog url.
-     * @param newUrl new blog url.
-     * @return replaced posts.
+     * @param oldUrl old blog url
+     * @param newUrl new blog url
+     * @param dryRun if true, only count occurrences without persisting any change
+     * @return a report describing the matched fields and occurrence counts
      */
     @NonNull
-    List<BasePostDetailDTO> replaceUrl(@NonNull String oldUrl, @NonNull String newUrl);
+    UrlReplaceModuleReport replaceUrl(@NonNull String oldUrl, @NonNull String newUrl,
+        boolean dryRun);
 
     /**
      * Generate description.

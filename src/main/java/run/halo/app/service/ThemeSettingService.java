@@ -6,6 +6,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.transaction.annotation.Transactional;
 import run.halo.app.model.entity.ThemeSetting;
+import run.halo.app.model.support.UrlReplaceModuleReport;
 import run.halo.app.service.base.CrudService;
 
 /**
@@ -57,13 +58,15 @@ public interface ThemeSettingService extends CrudService<ThemeSetting, Integer> 
     Map<String, Object> listAsMapBy(@NonNull String themeId);
 
     /**
-     * Replace theme setting url in batch.
+     * Replaces the blog url across all theme settings.
      *
-     * @param oldUrl old blog url.
-     * @param newUrl new blog url.
-     * @return replaced theme settings.
+     * @param oldUrl old blog url
+     * @param newUrl new blog url
+     * @param dryRun if true, only count occurrences without persisting any change
+     * @return a report describing the matched fields and occurrence counts
      */
-    List<ThemeSetting> replaceUrl(@NonNull String oldUrl, @NonNull String newUrl);
+    UrlReplaceModuleReport replaceUrl(@NonNull String oldUrl, @NonNull String newUrl,
+        boolean dryRun);
 
     /**
      * Delete unused theme setting.

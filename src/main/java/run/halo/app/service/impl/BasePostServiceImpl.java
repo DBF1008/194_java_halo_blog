@@ -30,7 +30,9 @@ import run.halo.app.model.dto.post.BasePostSimpleDTO;
 import run.halo.app.model.entity.BasePost;
 import run.halo.app.model.enums.PostEditorType;
 import run.halo.app.model.enums.PostStatus;
+import run.halo.app.model.enums.UrlReplaceModule;
 import run.halo.app.model.properties.PostProperties;
+import run.halo.app.model.support.UrlReplaceModuleReport;
 import run.halo.app.repository.base.BasePostRepository;
 import run.halo.app.service.OptionService;
 import run.halo.app.service.base.AbstractCrudService;
@@ -39,6 +41,7 @@ import run.halo.app.utils.DateUtils;
 import run.halo.app.utils.HaloUtils;
 import run.halo.app.utils.MarkdownUtils;
 import run.halo.app.utils.ServiceUtils;
+import run.halo.app.utils.UrlReplacer;
 
 /**
  * Base post service implementation.
@@ -457,24 +460,56 @@ public abstract class BasePostServiceImpl<POST extends BasePost>
     }
 
     @Override
-    public List<BasePostDetailDTO> replaceUrl(String oldUrl, String newUrl) {
-        List<POST> posts = listAll();
-        List<POST> replaced = new ArrayList<>();
-        posts.forEach(post -> {
-            if (StringUtils.isNotEmpty(post.getThumbnail())) {
-                post.setThumbnail(post.getThumbnail().replaceAll(oldUrl, newUrl));
+    public UrlReplaceModuleReport replaceUrl(String oldUrl, String newUrl, boolean dryRun) {
+        UrlReplaceModuleReport report = new UrlReplaceModuleReport(getReplaceModule());
+        List<POST> changed = new ArrayList<>();
+        for (POST post : listAll()) {
+            report.incScannedItemCount();
+            boolean hit = false;
+            UrlReplacer.FieldChange thumbnail =
+                report.apply("thumbnail", post.getThumbnail(), oldUrl, newUrl, true);
+            if (thumbnail.isChanged()) {
+                hit = true;
+                if (!dryRun) {
+                    post.setThumbnail(thumbnail.getNewValue());
+                }
             }
-            if (StringUtils.isNotEmpty(post.getOriginalContent())) {
-                post.setOriginalContent(post.getOriginalContent().replaceAll(oldUrl, newUrl));
+            UrlReplacer.FieldChange originalContent =
+                report.apply("originalContent", post.getOriginalContent(), oldUrl, newUrl, true);
+            if (originalContent.isChanged()) {
+                hit = true;
+                if (!dryRun) {
+                    post.setOriginalContent(originalContent.getNewValue());
+                }
             }
-            if (StringUtils.isNotEmpty(post.getFormatContent())) {
-                post.setFormatContent(post.getFormatContent().replaceAll(oldUrl, newUrl));
+            UrlReplacer.FieldChange formatContent =
+                report.apply("formatContent", post.getFormatContent(), oldUrl, newUrl, true);
+            if (formatContent.isChanged()) {
+                hit = true;
+                if (!dryRun) {
+                    post.setFormatContent(formatContent.getNewValue());
+                }
             }
-            replaced.add(post);
-        });
-        List<POST> updated = updateInBatch(replaced);
-        return updated.stream().map(this::convertToDetail).collect(Collectors.toList());
+            if (hit) {
+                report.markItemChanged();
+                if (!dryRun) {
+                    changed.add(post);
+                }
+            }
+        }
+        if (!dryRun && !changed.isEmpty()) {
+            updateInBatch(changed);
+        }
+        report.setApplied(!dryRun);
+        return report;
     }
+
+    /**
+     * Returns the url-replace module this service contributes to.
+     *
+     * @return the url-replace module
+     */
+    protected abstract UrlReplaceModule getReplaceModule();
 
     @Override
     public String generateDescription(String content) {

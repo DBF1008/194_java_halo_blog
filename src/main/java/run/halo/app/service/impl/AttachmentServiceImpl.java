@@ -24,14 +24,17 @@ import run.halo.app.handler.file.FileHandlers;
 import run.halo.app.model.dto.AttachmentDTO;
 import run.halo.app.model.entity.Attachment;
 import run.halo.app.model.enums.AttachmentType;
+import run.halo.app.model.enums.UrlReplaceModule;
 import run.halo.app.model.params.AttachmentQuery;
 import run.halo.app.model.properties.AttachmentProperties;
 import run.halo.app.model.support.UploadResult;
+import run.halo.app.model.support.UrlReplaceModuleReport;
 import run.halo.app.repository.AttachmentRepository;
 import run.halo.app.service.AttachmentService;
 import run.halo.app.service.OptionService;
 import run.halo.app.service.base.AbstractCrudService;
 import run.halo.app.utils.HaloUtils;
+import run.halo.app.utils.UrlReplacer;
 
 /**
  * AttachmentService implementation
@@ -199,19 +202,40 @@ public class AttachmentServiceImpl extends AbstractCrudService<Attachment, Integ
     }
 
     @Override
-    public List<Attachment> replaceUrl(String oldUrl, String newUrl) {
-        List<Attachment> attachments = listAll();
-        List<Attachment> replaced = new ArrayList<>();
-        attachments.forEach(attachment -> {
-            if (StringUtils.isNotEmpty(attachment.getPath())) {
-                attachment.setPath(attachment.getPath().replaceAll(oldUrl, newUrl));
+    public UrlReplaceModuleReport replaceUrl(String oldUrl, String newUrl, boolean dryRun) {
+        UrlReplaceModuleReport report = new UrlReplaceModuleReport(UrlReplaceModule.ATTACHMENT);
+        List<Attachment> changed = new ArrayList<>();
+        for (Attachment attachment : listAll()) {
+            report.incScannedItemCount();
+            boolean hit = false;
+            UrlReplacer.FieldChange path =
+                report.apply("path", attachment.getPath(), oldUrl, newUrl, true);
+            if (path.isChanged()) {
+                hit = true;
+                if (!dryRun) {
+                    attachment.setPath(path.getNewValue());
+                }
             }
-            if (StringUtils.isNotEmpty(attachment.getThumbPath())) {
-                attachment.setThumbPath(attachment.getThumbPath().replaceAll(oldUrl, newUrl));
+            UrlReplacer.FieldChange thumbPath =
+                report.apply("thumbPath", attachment.getThumbPath(), oldUrl, newUrl, true);
+            if (thumbPath.isChanged()) {
+                hit = true;
+                if (!dryRun) {
+                    attachment.setThumbPath(thumbPath.getNewValue());
+                }
             }
-            replaced.add(attachment);
-        });
-        return updateInBatch(replaced);
+            if (hit) {
+                report.markItemChanged();
+                if (!dryRun) {
+                    changed.add(attachment);
+                }
+            }
+        }
+        if (!dryRun && !changed.isEmpty()) {
+            updateInBatch(changed);
+        }
+        report.setApplied(!dryRun);
+        return report;
     }
 
     @Override

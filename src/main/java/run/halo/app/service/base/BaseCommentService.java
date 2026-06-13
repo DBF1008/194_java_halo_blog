@@ -14,6 +14,7 @@ import run.halo.app.model.entity.BaseComment;
 import run.halo.app.model.enums.CommentStatus;
 import run.halo.app.model.params.BaseCommentParam;
 import run.halo.app.model.params.CommentQuery;
+import run.halo.app.model.support.UrlReplaceModuleReport;
 import run.halo.app.model.vo.BaseCommentVO;
 import run.halo.app.model.vo.BaseCommentWithParentVO;
 import run.halo.app.model.vo.CommentWithHasChildrenVO;
@@ -312,12 +313,14 @@ public interface BaseCommentService<COMMENT extends BaseComment>
     <T extends BaseCommentDTO> Page<T> filterIpAddress(@NonNull Page<T> commentPage);
 
     /**
-     * Replace comment url in batch.
+     * Replaces the blog url across all comments.
      *
-     * @param oldUrl old blog url.
-     * @param newUrl new blog url.
-     * @return replaced comments.
+     * @param oldUrl old blog url
+     * @param newUrl new blog url
+     * @param dryRun if true, only count occurrences without persisting any change
+     * @return a report describing the matched fields and occurrence counts
      */
-    List<BaseCommentDTO> replaceUrl(@NonNull String oldUrl, @NonNull String newUrl);
+    UrlReplaceModuleReport replaceUrl(@NonNull String oldUrl, @NonNull String newUrl,
+        boolean dryRun);
 
 }

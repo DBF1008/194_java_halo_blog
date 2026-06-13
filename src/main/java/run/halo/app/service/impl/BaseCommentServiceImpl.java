@@ -38,6 +38,7 @@ import run.halo.app.model.dto.BaseCommentDTO;
 import run.halo.app.model.entity.BaseComment;
 import run.halo.app.model.entity.User;
 import run.halo.app.model.enums.CommentStatus;
+import run.halo.app.model.enums.UrlReplaceModule;
 import run.halo.app.model.params.BaseCommentParam;
 import run.halo.app.model.params.CommentQuery;
 import run.halo.app.model.projection.CommentChildrenCountProjection;
@@ -45,6 +46,7 @@ import run.halo.app.model.projection.CommentCountProjection;
 import run.halo.app.model.properties.BlogProperties;
 import run.halo.app.model.properties.CommentProperties;
 import run.halo.app.model.support.CommentPage;
+import run.halo.app.model.support.UrlReplaceModuleReport;
 import run.halo.app.model.vo.BaseCommentVO;
 import run.halo.app.model.vo.BaseCommentWithParentVO;
 import run.halo.app.model.vo.CommentWithHasChildrenVO;
@@ -57,6 +59,7 @@ import run.halo.app.service.base.AbstractCrudService;
 import run.halo.app.service.base.BaseCommentService;
 import run.halo.app.utils.ServiceUtils;
 import run.halo.app.utils.ServletUtils;
+import run.halo.app.utils.UrlReplacer;
 import run.halo.app.utils.ValidationUtils;
 
 /**
@@ -652,18 +655,34 @@ public abstract class BaseCommentServiceImpl<COMMENT extends BaseComment>
     }
 
     @Override
-    public List<BaseCommentDTO> replaceUrl(String oldUrl, String newUrl) {
-        List<COMMENT> comments = listAll();
-        List<COMMENT> replaced = new ArrayList<>();
-        comments.forEach(comment -> {
-            if (StringUtils.isNotEmpty(comment.getAuthorUrl())) {
-                comment.setAuthorUrl(comment.getAuthorUrl().replaceAll(oldUrl, newUrl));
+    public UrlReplaceModuleReport replaceUrl(String oldUrl, String newUrl, boolean dryRun) {
+        UrlReplaceModuleReport report = new UrlReplaceModuleReport(getReplaceModule());
+        List<COMMENT> changed = new ArrayList<>();
+        for (COMMENT comment : listAll()) {
+            report.incScannedItemCount();
+            UrlReplacer.FieldChange authorUrl =
+                report.apply("authorUrl", comment.getAuthorUrl(), oldUrl, newUrl, true);
+            if (authorUrl.isChanged()) {
+                report.markItemChanged();
+                if (!dryRun) {
+                    comment.setAuthorUrl(authorUrl.getNewValue());
+                    changed.add(comment);
+                }
             }
-            replaced.add(comment);
-        });
-        List<COMMENT> updated = updateInBatch(replaced);
-        return convertTo(updated);
+        }
+        if (!dryRun && !changed.isEmpty()) {
+            updateInBatch(changed);
+        }
+        report.setApplied(!dryRun);
+        return report;
     }
+
+    /**
+     * Returns the url-replace module this service contributes to.
+     *
+     * @return the url-replace module
+     */
+    protected abstract UrlReplaceModule getReplaceModule();
 
     /**
      * Get children comments recursively.

@@ -21,6 +21,7 @@ import run.halo.app.model.enums.ValueEnum;
 import run.halo.app.model.params.OptionParam;
 import run.halo.app.model.params.OptionQuery;
 import run.halo.app.model.properties.PropertyEnum;
+import run.halo.app.model.support.UrlReplaceModuleReport;
 import run.halo.app.service.base.CrudService;
 
 /**
@@ -467,13 +468,15 @@ public interface OptionService extends CrudService<Option, Integer> {
     Boolean isEnabledAbsolutePath();
 
     /**
-     * Replace option url in batch.
+     * Replaces the blog url across all options.
      *
-     * @param oldUrl old blog url.
-     * @param newUrl new blog url.
-     * @return replaced options.
+     * @param oldUrl old blog url
+     * @param newUrl new blog url
+     * @param dryRun if true, only count occurrences without persisting any change
+     * @return a report describing the matched fields and occurrence counts
      */
-    List<OptionDTO> replaceUrl(@NonNull String oldUrl, @NonNull String newUrl);
+    UrlReplaceModuleReport replaceUrl(@NonNull String oldUrl, @NonNull String newUrl,
+        boolean dryRun);
 
     /**
      * Converts to option output dto.

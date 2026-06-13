@@ -9,6 +9,7 @@ import run.halo.app.model.dto.PhotoDTO;
 import run.halo.app.model.entity.Photo;
 import run.halo.app.model.params.PhotoParam;
 import run.halo.app.model.params.PhotoQuery;
+import run.halo.app.model.support.UrlReplaceModuleReport;
 import run.halo.app.model.vo.PhotoTeamVO;
 import run.halo.app.service.base.CrudService;
 
@@ -81,11 +82,13 @@ public interface PhotoService extends CrudService<Photo, Integer> {
     List<String> listAllTeams();
 
     /**
-     * Replace photo url in batch.
+     * Replaces the blog url across all photos.
      *
-     * @param oldUrl old blog url.
-     * @param newUrl new blog url.
-     * @return replaced photos.
+     * @param oldUrl old blog url
+     * @param newUrl new blog url
+     * @param dryRun if true, only count occurrences without persisting any change
+     * @return a report describing the matched fields and occurrence counts
      */
-    List<PhotoDTO> replaceUrl(@NonNull String oldUrl, @NonNull String newUrl);
+    UrlReplaceModuleReport replaceUrl(@NonNull String oldUrl, @NonNull String newUrl,
+        boolean dryRun);
 }

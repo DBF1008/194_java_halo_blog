@@ -17,13 +17,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import run.halo.app.model.dto.PhotoDTO;
 import run.halo.app.model.entity.Photo;
+import run.halo.app.model.enums.UrlReplaceModule;
 import run.halo.app.model.params.PhotoParam;
 import run.halo.app.model.params.PhotoQuery;
+import run.halo.app.model.support.UrlReplaceModuleReport;
 import run.halo.app.model.vo.PhotoTeamVO;
 import run.halo.app.repository.PhotoRepository;
 import run.halo.app.service.PhotoService;
 import run.halo.app.service.base.AbstractCrudService;
 import run.halo.app.utils.ServiceUtils;
+import run.halo.app.utils.UrlReplacer;
 
 /**
  * PhotoService implementation class
