@@ -14,14 +14,18 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.HtmlUtils;
-import run.halo.app.model.entity.Post;
 import run.halo.app.model.vo.PostListVO;
+import run.halo.app.service.ContentSearchService;
 import run.halo.app.service.OptionService;
-import run.halo.app.service.PostService;
 import run.halo.app.service.ThemeService;
 
 /**
  * Search controller.
+ *
+ * <p>Renders the theme search page using the unified content search service.
+ * The theme template receives a {@code Page<PostListVO>} identical to what
+ * the legacy PostService-based search provided, ensuring full backward
+ * compatibility with existing themes.</p>
  *
  * @author ryanwang
  * @date 2019-04-21
@@ -30,15 +34,16 @@ import run.halo.app.service.ThemeService;
 @RequestMapping(value = "/search")
 public class ContentSearchController {
 
-    private final PostService postService;
+    private final ContentSearchService contentSearchService;
 
     private final OptionService optionService;
 
     private final ThemeService themeService;
 
-    public ContentSearchController(PostService postService, OptionService optionService,
+    public ContentSearchController(ContentSearchService contentSearchService,
+        OptionService optionService,
         ThemeService themeService) {
-        this.postService = postService;
+        this.contentSearchService = contentSearchService;
         this.optionService = optionService;
         this.themeService = themeService;
     }
@@ -69,9 +74,8 @@ public class ContentSearchController {
         @PathVariable(value = "page") Integer page,
         @SortDefault(sort = "createTime", direction = DESC) Sort sort) {
         final Pageable pageable = PageRequest.of(page - 1, optionService.getPostPageSize(), sort);
-        final Page<Post> postPage = postService.pageBy(keyword, pageable);
 
-        final Page<PostListVO> posts = postService.convertToListVo(postPage);
+        final Page<PostListVO> posts = contentSearchService.searchPostsCompat(keyword, pageable);
 
         model.addAttribute("is_search", true);
         model.addAttribute("keyword", keyword);

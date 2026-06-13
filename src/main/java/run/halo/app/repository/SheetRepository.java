@@ -1,6 +1,7 @@
 package run.halo.app.repository;
 
 import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.lang.NonNull;
 import run.halo.app.model.entity.Sheet;
@@ -13,7 +14,7 @@ import run.halo.app.repository.base.BasePostRepository;
  * @author johnniang
  * @date 3/22/19
  */
-public interface SheetRepository extends BasePostRepository<Sheet> {
+public interface SheetRepository extends BasePostRepository<Sheet>, JpaSpecificationExecutor<Sheet> {
 
     /**
      * Count all sheet visits.
