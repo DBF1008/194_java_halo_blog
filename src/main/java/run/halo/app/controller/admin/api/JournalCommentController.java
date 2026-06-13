@@ -112,4 +112,19 @@ public class JournalCommentController {
         JournalComment deletedJournalComment = journalCommentService.removeById(commentId);
         return journalCommentService.convertTo(deletedJournalComment);
     }
+
+    @PutMapping("status/{status}")
+    @ApiOperation("Updates journal comment status in batch")
+    public List<BaseCommentDTO> updateStatusInBatch(
+        @PathVariable(name = "status") CommentStatus status,
+        @RequestBody List<Long> ids) {
+        List<JournalComment> comments = journalCommentService.updateStatusByIds(ids, status);
+        return journalCommentService.convertTo(comments);
+    }
+
+    @DeleteMapping
+    @ApiOperation("Deletes journal comments permanently in batch")
+    public List<JournalComment> deletePermanentlyInBatch(@RequestBody List<Long> ids) {
+        return journalCommentService.removeByIds(ids);
+    }
 }

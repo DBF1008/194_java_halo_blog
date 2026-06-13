@@ -1,5 +1,7 @@
 package run.halo.app.repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -33,4 +35,13 @@ public interface CommentBlackListRepository extends BaseRepository<CommentBlackL
     @Query("UPDATE CommentBlackList SET banTime=:#{#commentBlackList.banTime} WHERE "
         + "ipAddress=:#{#commentBlackList.ipAddress}")
     int updateByIpAddress(@Param("commentBlackList") CommentBlackList commentBlackList);
+
+    /**
+     * Find all blacklist entries matching the given IP addresses.
+     * Used for batch enrichment in the moderation inbox.
+     *
+     * @param ipAddresses collection of IP addresses
+     * @return list of blacklist entries
+     */
+    List<CommentBlackList> findAllByIpAddressIn(Collection<String> ipAddresses);
 }

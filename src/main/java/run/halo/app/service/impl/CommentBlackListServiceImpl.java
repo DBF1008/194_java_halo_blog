@@ -84,4 +84,16 @@ public class CommentBlackListServiceImpl extends AbstractCrudService<CommentBlac
     private Date getBanTime(LocalDateTime localDateTime, Integer banTime) {
         return new Date(DateTimeUtils.toEpochMilli(localDateTime.plusMinutes(banTime)));
     }
+
+    @Override
+    public boolean isIpBanned(String ipAddress) {
+        return commentBlackListRepository.findByIpAddress(ipAddress)
+            .map(bl -> bl.getBanTime().after(new Date()))
+            .orElse(false);
+    }
+
+    @Override
+    public Optional<CommentBlackList> getByIpAddress(String ipAddress) {
+        return commentBlackListRepository.findByIpAddress(ipAddress);
+    }
 }
