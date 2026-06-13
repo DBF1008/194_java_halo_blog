@@ -1,0 +1,116 @@
+run/halo/app/utils/VersionTest.java
+ run.halo.app.utils.VersionTest
+run/halo/app/it/IndexPageRequestTest.java
+ run.halo.app.it.IndexPageRequestTest
+run/halo/app/model/params/InstallParamTest.java
+ run.halo.app.model.params.InstallParamTest
+run/halo/app/service/RecoveryServiceTest.java
+ run.halo.app.service.RecoveryServiceTest
+run/halo/app/repository/ThemeRepositoryImplTest.java
+ run.halo.app.repository.ThemeRepositoryImplTest
+run/halo/app/utils/ReflectionUtilsTest.java
+ run.halo.app.utils.ReflectionUtilsTest
+run/halo/app/utils/MarkdownUtilsTest.java
+ run.halo.app.utils.MarkdownUtilsTest
+run/halo/app/utils/YamlTest.java
+ run.halo.app.utils.YamlTest
+run/halo/app/utils/FileUtilsTest.java
+ run.halo.app.utils.FileUtilsTest
+run/halo/app/repository/SheetRepositoryTest.java
+ run.halo.app.repository.SheetRepositoryTest
+run/halo/app/utils/InetAddressTest.java
+ run.halo.app.utils.InetAddressTest
+run/halo/app/utils/JsonUtilsTest.java
+ run.halo.app.utils.JsonUtilsTest
+run/halo/app/it/BaseApiTest.java
+ run.halo.app.it.BaseApiTest
+run/halo/app/utils/SlugUtilsTest.java
+ run.halo.app.utils.SlugUtilsTest
+run/halo/app/utils/VersionUtilTest.java
+ run.halo.app.utils.VersionUtilTest
+run/halo/app/utils/BcryptTest.java
+ run.halo.app.utils.BcryptTest
+run/halo/app/utils/BeanUtilsTest.java
+ run.halo.app.utils.BeanUtilsTest
+ run.halo.app.utils.BeanUtilsTest$TestA
+ run.halo.app.utils.BeanUtilsTest$TestB
+ run.halo.app.utils.BeanUtilsTest$TestC
+ run.halo.app.utils.BeanUtilsTest$TestD
+ run.halo.app.utils.BeanUtilsTest$TestE
+run/halo/app/utils/HttpClientUtilsTest.java
+ run.halo.app.utils.HttpClientUtilsTest
+run/halo/app/theme/GitThemeFetcherTest.java
+ run.halo.app.theme.GitThemeFetcherTest
+run/halo/app/utils/FilenameUtilsTest.java
+ run.halo.app.utils.FilenameUtilsTest
+run/halo/app/service/impl/ThemeServiceImplTest.java
+ run.halo.app.service.impl.ThemeServiceImplTest
+run/halo/app/model/MediaTypeTest.java
+ run.halo.app.model.MediaTypeTest
+run/halo/app/utils/GitTest.java
+ run.halo.app.utils.GitTest
+run/halo/app/utils/GithubUtilsTest.java
+ run.halo.app.utils.GithubUtilsTest
+run/halo/app/utils/URITest.java
+ run.halo.app.utils.URITest
+run/halo/app/utils/HaloUtilsTest.java
+ run.halo.app.utils.HaloUtilsTest
+run/halo/app/freemarker/FreeMarkerTest.java
+ run.halo.app.freemarker.FreeMarkerTest
+run/halo/app/utils/ValidationUtilsTest.java
+ run.halo.app.utils.ValidationUtilsTest
+ run.halo.app.utils.ValidationUtilsTest$Car
+run/halo/app/service/impl/PostServiceImplTest.java
+ run.halo.app.service.impl.PostServiceImplTest
+run/halo/app/utils/LocalDateTimeTest.java
+ run.halo.app.utils.LocalDateTimeTest
+run/halo/app/conf/AntPathMatcherTest.java
+ run.halo.app.conf.AntPathMatcherTest
+run/halo/app/security/OneTimeTokenTest.java
+ run.halo.app.security.OneTimeTokenTest
+run/halo/app/controller/DisableOnConditionController.java
+ run.halo.app.controller.DisableOnConditionController
+run/halo/app/handler/theme/YamlThemePropertyResolverTest.java
+ run.halo.app.handler.theme.YamlThemePropertyResolverTest
+run/halo/app/utils/DateTimeUtilsTest.java
+ run.halo.app.utils.DateTimeUtilsTest
+run/halo/app/utils/PathTest.java
+ run.halo.app.utils.PathTest
+run/halo/app/model/properties/PropertyEnumTest.java
+ run.halo.app.model.properties.PropertyEnumTest
+run/halo/app/model/dto/base/OutputConverterTest.java
+ run.halo.app.model.dto.base.OutputConverterTest
+ run.halo.app.model.dto.base.OutputConverterTest$SubTestOutputDTO
+ run.halo.app.model.dto.base.OutputConverterTest$TestDomain
+ run.halo.app.model.dto.base.OutputConverterTest$TestOutputDTO
+run/halo/app/service/impl/OptionServiceImplTest.java
+ run.halo.app.service.impl.OptionServiceImplTest
+run/halo/app/service/support/HaloMediaTypeTest.java
+ run.halo.app.service.support.HaloMediaTypeTest
+run/halo/app/model/enums/AttachmentTypeTest.java
+ run.halo.app.model.enums.AttachmentTypeTest
+run/halo/app/theme/ZipThemeFetcherTest.java
+ run.halo.app.theme.ZipThemeFetcherTest
+run/halo/app/utils/DirectoryAttackTest.java
+ run.halo.app.utils.DirectoryAttackTest
+run/halo/app/cache/InMemoryCacheStoreTest.java
+ run.halo.app.cache.InMemoryCacheStoreTest
+run/halo/app/utils/TimeUnitTest.java
+ run.halo.app.utils.TimeUnitTest
+run/halo/app/utils/PathsTest.java
+ run.halo.app.utils.PathsTest
+run/halo/app/model/enums/DataTypeTest.java
+ run.halo.app.model.enums.DataTypeTest
+run/halo/app/cache/CacheStoreTest.java
+ run.halo.app.cache.CacheStoreTest
+run/halo/app/aspect/SensitiveConcealAspectTest.java
+ run.halo.app.aspect.SensitiveConcealAspectTest
+run/halo/app/utils/TwoFactorAuthUtilsTest.java
+ run.halo.app.utils.TwoFactorAuthUtilsTest
+run/halo/app/model/dto/base/InputConverterTest.java
+ run.halo.app.model.dto.base.InputConverterTest
+ run.halo.app.model.dto.base.InputConverterTest$SubTestInputDTO
+ run.halo.app.model.dto.base.InputConverterTest$TestDomain
+ run.halo.app.model.dto.base.InputConverterTest$TestInputDTO
+run/halo/app/aspect/DisableOnConditionAspectTest.java
+ run.halo.app.aspect.DisableOnConditionAspectTest
