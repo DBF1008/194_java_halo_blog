@@ -1,10 +1,15 @@
 package run.halo.app.service.impl;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
 import run.halo.app.model.entity.CommentBlackList;
 import run.halo.app.model.enums.CommentViolationTypeEnum;
 import run.halo.app.model.properties.CommentProperties;
@@ -26,6 +31,12 @@ import run.halo.app.utils.DateTimeUtils;
 @Slf4j
 public class CommentBlackListServiceImpl extends AbstractCrudService<CommentBlackList, Long>
     implements CommentBlackListService {
+
+    /**
+     * Years used as a long-term ban when no explicit ban duration is provided.
+     */
+    private static final long LONG_TERM_BAN_YEARS = 100L;
+
     private final CommentBlackListRepository commentBlackListRepository;
     private final PostCommentRepository postCommentRepository;
     private final OptionService optionService;
@@ -72,6 +83,67 @@ public class CommentBlackListServiceImpl extends AbstractCrudService<CommentBlac
             return CommentViolationTypeEnum.FREQUENTLY;
         }
         return CommentViolationTypeEnum.NORMAL;
+    }
+
+    @Override
+    public boolean isBanned(String ipAddress) {
+        Assert.hasText(ipAddress, "IP address must not be blank");
+        return commentBlackListRepository.findByIpAddress(ipAddress)
+            .map(blackList -> blackList.getBanTime() != null
+                && blackList.getBanTime().after(new Date()))
+            .orElse(false);
+    }
+
+    @Override
+    public Optional<CommentBlackList> getByIpAddress(String ipAddress) {
+        Assert.hasText(ipAddress, "IP address must not be blank");
+        return commentBlackListRepository.findByIpAddress(ipAddress);
+    }
+
+    @Override
+    public CommentBlackList ban(String ipAddress, Long banMinutes) {
+        Assert.hasText(ipAddress, "IP address must not be blank");
+        Date banTime = computeBanTime(banMinutes);
+        Optional<CommentBlackList> blackListOptional =
+            commentBlackListRepository.findByIpAddress(ipAddress);
+        if (blackListOptional.isPresent()) {
+            // Re-ban (续封): refresh the ban time from now on the existing entry
+            CommentBlackList blackList = blackListOptional.get();
+            blackList.setBanTime(banTime);
+            int updateResult = commentBlackListRepository.updateByIpAddress(blackList);
+            if (updateResult <= 0) {
+                log.error("更新评论封禁时间失败, ipAddress: [{}]", ipAddress);
+            }
+            return blackList;
+        }
+        CommentBlackList blackList = CommentBlackList.builder()
+            .ipAddress(ipAddress)
+            .banTime(banTime)
+            .build();
+        return create(blackList);
+    }
+
+    @Override
+    public void unban(String ipAddress) {
+        Assert.hasText(ipAddress, "IP address must not be blank");
+        commentBlackListRepository.findByIpAddress(ipAddress)
+            .ifPresent(commentBlackListRepository::delete);
+    }
+
+    @Override
+    public List<CommentBlackList> listByIpAddressIn(Collection<String> ipAddresses) {
+        if (CollectionUtils.isEmpty(ipAddresses)) {
+            return Collections.emptyList();
+        }
+        return commentBlackListRepository.findByIpAddressIn(ipAddresses);
+    }
+
+    private Date computeBanTime(Long banMinutes) {
+        LocalDateTime now = DateTimeUtils.now();
+        LocalDateTime banUntil = banMinutes != null
+            ? now.plusMinutes(banMinutes)
+            : now.plusYears(LONG_TERM_BAN_YEARS);
+        return new Date(DateTimeUtils.toEpochMilli(banUntil));
     }
 
     private void update(LocalDateTime localDateTime, CommentBlackList blackList, Integer banTime) {
