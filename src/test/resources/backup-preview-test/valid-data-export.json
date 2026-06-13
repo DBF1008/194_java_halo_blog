@@ -1,0 +1,60 @@
+{
+  "version": "1.4.7",
+  "export_date": "2024-01-15 10:30:00",
+  "attachments": [
+    {"id": 1, "name": "photo1.jpg", "path": "/upload/2024/1/photo1.jpg", "fileKey": "photo1", "type": "LOCAL"},
+    {"id": 2, "name": "photo2.png", "path": "/upload/2024/1/photo2.png", "fileKey": "photo2", "type": "LOCAL"}
+  ],
+  "categories": [
+    {"id": 1, "name": "Tech", "slug": "tech", "description": "Technology posts", "parentId": 0},
+    {"id": 2, "name": "Life", "slug": "life", "description": "Life posts", "parentId": 0}
+  ],
+  "comment_black_list": [],
+  "journals": [
+    {"id": 1, "sourceContent": "Hello journal", "content": "Hello journal", "likes": 0, "type": "PUBLIC"}
+  ],
+  "journal_comments": [],
+  "links": [
+    {"id": 1, "name": "Halo", "url": "https://halo.run", "logo": "", "description": "Halo blog", "team": "", "priority": 0}
+  ],
+  "logs": [],
+  "menus": [
+    {"id": 1, "name": "Home", "url": "/", "priority": 0, "target": "_self", "icon": "", "parentId": 0, "team": ""}
+  ],
+  "options": [
+    {"id": 1, "type": "INTERNAL", "key": "blog_title", "value": "My Blog"},
+    {"id": 2, "type": "INTERNAL", "key": "blog_url", "value": "https://example.com"},
+    {"id": 3, "type": "INTERNAL", "key": "blog_logo", "value": ""},
+    {"id": 4, "type": "INTERNAL", "key": "blog_favicon", "value": ""}
+  ],
+  "photos": [],
+  "posts": [
+    {"id": 1, "title": "Hello World", "slug": "hello-world", "status": 0, "originalContent": "Hello!", "formatContent": "Hello!", "visits": 100, "likes": 10},
+    {"id": 2, "title": "Second Post", "slug": "second-post", "status": 1, "originalContent": "Draft content", "formatContent": "Draft content", "visits": 0, "likes": 0}
+  ],
+  "post_categories": [
+    {"id": 1, "categoryId": 1, "postId": 1}
+  ],
+  "post_comments": [
+    {"id": 1, "author": "visitor", "email": "visitor@test.com", "content": "Nice post!", "status": 0, "postId": 1, "isAdmin": false, "parentId": 0}
+  ],
+  "post_metas": [],
+  "post_tags": [
+    {"id": 1, "postId": 1, "tagId": 1}
+  ],
+  "sheets": [
+    {"id": 10, "title": "About", "slug": "about", "status": 0, "originalContent": "About page", "formatContent": "About page", "visits": 50, "likes": 5}
+  ],
+  "sheet_comments": [],
+  "sheet_metas": [],
+  "tags": [
+    {"id": 1, "name": "java", "slug": "java"},
+    {"id": 2, "name": "spring", "slug": "spring"}
+  ],
+  "theme_settings": [
+    {"id": 1, "key": "sidebar_style", "value": "compact", "themeId": "anatole"}
+  ],
+  "user": [
+    {"id": 1, "username": "admin", "nickname": "Admin", "email": "admin@test.com", "password": "$2a$10$hash", "avatar": "", "description": "Blog admin"}
+  ]
+}
