@@ -22,6 +22,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
@@ -41,6 +42,7 @@ import run.halo.app.exception.ThemeUpdateException;
 import run.halo.app.handler.theme.config.ThemeConfigResolver;
 import run.halo.app.handler.theme.config.support.Group;
 import run.halo.app.handler.theme.config.support.ThemeProperty;
+import run.halo.app.model.dto.ThemePreviewDTO;
 import run.halo.app.model.support.HaloConst;
 import run.halo.app.model.support.ThemeFile;
 import run.halo.app.repository.ThemeRepository;
@@ -52,6 +54,7 @@ import run.halo.app.theme.MultipartFileThemeUpdater;
 import run.halo.app.theme.MultipartZipFileThemeFetcher;
 import run.halo.app.theme.ThemeFetcherComposite;
 import run.halo.app.theme.ThemeFileScanner;
+import run.halo.app.theme.ThemePreviewer;
 import run.halo.app.theme.ThemePropertyScanner;
 import run.halo.app.theme.ZipThemeFetcher;
 import run.halo.app.utils.FileUtils;
@@ -564,6 +567,87 @@ public class ThemeServiceImpl implements ThemeService {
             return themeUpdater.update(themeId);
         } catch (IOException e) {
             throw new ServiceException("更新主题失败：" + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @NonNull
+    public ThemePreviewDTO previewByFetching(@NonNull String uri) {
+        Assert.hasText(uri, "Theme remote uri must not be blank");
+
+        final var candidate = fetcherComposite.fetch(uri);
+        final var existing = fetchThemePropertyBy(candidate.getId()).orElse(null);
+        return buildAndCleanup(candidate, existing);
+    }
+
+    @Override
+    @NonNull
+    public ThemePreviewDTO previewByUpload(@NonNull MultipartFile file) {
+        Assert.notNull(file, "Multipart file must not be null");
+
+        final var candidate = fetcherComposite.fetch(file);
+        final var existing = fetchThemePropertyBy(candidate.getId()).orElse(null);
+        return buildAndCleanup(candidate, existing);
+    }
+
+    @Override
+    @NonNull
+    public ThemePreviewDTO previewUpdateByFetching(@NonNull String themeId) {
+        Assert.hasText(themeId, "Theme id must not be blank");
+
+        final var existing = getThemeOfNonNullBy(themeId);
+        if (StringUtils.isBlank(existing.getRepo())) {
+            throw new BadRequestException("该主题不支持在线更新！").setErrorData(themeId);
+        }
+        final var candidate = fetcherComposite.fetch(existing.getRepo());
+        return buildAndCleanup(candidate, existing);
+    }
+
+    @Override
+    @NonNull
+    public ThemePreviewDTO previewUpdateByUpload(@NonNull String themeId,
+        @NonNull MultipartFile file) {
+        Assert.hasText(themeId, "Theme id must not be blank");
+        Assert.notNull(file, "Theme file must not be null");
+
+        final var existing = getThemeOfNonNullBy(themeId);
+        final var candidate = fetcherComposite.fetch(file);
+        if (!StringUtils.equals(existing.getId(), candidate.getId())) {
+            // Clean up the freshly fetched candidate temp dir before failing so we never
+            // leak temporary directories on a mismatched upload.
+            deleteFolderQuietly(Paths.get(candidate.getThemePath()));
+            throw new BadRequestException("上传的主题 "
+                + candidate.getId()
+                + " 和当前主题的 "
+                + existing.getId()
+                + " 不一致，无法进行更新操作！").setErrorData(themeId);
+        }
+        return buildAndCleanup(candidate, existing);
+    }
+
+    /**
+     * Computes a side-effect-free preview for a freshly fetched candidate theme and then removes
+     * the candidate's temporary directory. The currently installed theme directory (if any) is
+     * only read, never modified, and no database writes or theme events are produced.
+     *
+     * @param candidate the freshly fetched candidate theme; its {@code themePath} points at a
+     *     temporary directory produced by the fetcher
+     * @param existing the currently installed theme with the same id, or {@code null} for a fresh
+     *     install
+     * @return the preview result
+     */
+    @NonNull
+    private ThemePreviewDTO buildAndCleanup(@NonNull ThemeProperty candidate,
+        @Nullable ThemeProperty existing) {
+        try {
+            final Path existingRoot =
+                existing == null ? null : Paths.get(existing.getThemePath());
+            final boolean affects = candidate.getId() != null
+                && candidate.getId().equals(getActivatedThemeId());
+            return ThemePreviewer.INSTANCE.preview(
+                candidate, existingRoot, HaloConst.HALO_VERSION, affects);
+        } finally {
+            deleteFolderQuietly(Paths.get(candidate.getThemePath()));
         }
     }
 

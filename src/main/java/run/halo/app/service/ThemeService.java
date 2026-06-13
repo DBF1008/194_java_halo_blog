@@ -9,6 +9,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.web.multipart.MultipartFile;
 import run.halo.app.handler.theme.config.support.Group;
 import run.halo.app.handler.theme.config.support.ThemeProperty;
+import run.halo.app.model.dto.ThemePreviewDTO;
 import run.halo.app.model.support.ThemeFile;
 
 /**
@@ -390,4 +391,54 @@ public interface ThemeService {
      * @return theme info
      */
     ThemeProperty update(@NonNull String themeId, @NonNull MultipartFile file);
+
+    /**
+     * Builds a dry-run preview of installing a theme fetched from a remote uri (zip or git).
+     *
+     * <p>This never writes to the theme work directory, never modifies the database and never
+     * publishes theme events. The fetched candidate is read into a temporary directory which is
+     * removed before this method returns.</p>
+     *
+     * @param uri theme remote uri must not be blank
+     * @return preview of the change set
+     */
+    @NonNull
+    ThemePreviewDTO previewByFetching(@NonNull String uri);
+
+    /**
+     * Builds a dry-run preview of installing a theme from an uploaded zip package.
+     *
+     * <p>This never writes to the theme work directory, never modifies the database and never
+     * publishes theme events.</p>
+     *
+     * @param file multipart file must not be null
+     * @return preview of the change set
+     */
+    @NonNull
+    ThemePreviewDTO previewByUpload(@NonNull MultipartFile file);
+
+    /**
+     * Builds a dry-run preview of updating an existing theme from its configured remote repo.
+     *
+     * <p>The currently installed theme directory is only read, never modified. The freshly
+     * fetched candidate is read into a temporary directory which is removed before this method
+     * returns.</p>
+     *
+     * @param themeId theme id must not be blank
+     * @return preview of the change set
+     */
+    @NonNull
+    ThemePreviewDTO previewUpdateByFetching(@NonNull String themeId);
+
+    /**
+     * Builds a dry-run preview of updating an existing theme from an uploaded zip package.
+     *
+     * <p>The currently installed theme directory is only read, never modified.</p>
+     *
+     * @param themeId theme id must not be blank
+     * @param file multipart file must not be null
+     * @return preview of the change set
+     */
+    @NonNull
+    ThemePreviewDTO previewUpdateByUpload(@NonNull String themeId, @NonNull MultipartFile file);
 }

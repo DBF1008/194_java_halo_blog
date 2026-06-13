@@ -19,6 +19,7 @@ import run.halo.app.annotation.DisableOnCondition;
 import run.halo.app.cache.lock.CacheLock;
 import run.halo.app.handler.theme.config.support.Group;
 import run.halo.app.handler.theme.config.support.ThemeProperty;
+import run.halo.app.model.dto.ThemePreviewDTO;
 import run.halo.app.model.params.ThemeContentParam;
 import run.halo.app.model.support.BaseResponse;
 import run.halo.app.model.support.ThemeFile;
@@ -231,6 +232,31 @@ public class ThemeController {
     @ApiOperation("Upgrades theme from remote")
     public ThemeProperty updateThemeByFetching(@PathVariable("themeId") String themeId) {
         return themeService.update(themeId);
+    }
+
+    @PostMapping("upload/preview")
+    @ApiOperation("Previews installing a theme from an uploaded package (dry-run)")
+    public ThemePreviewDTO previewUploadTheme(@RequestPart("file") MultipartFile file) {
+        return themeService.previewByUpload(file);
+    }
+
+    @PutMapping("upload/{themeId:.+}/preview")
+    @ApiOperation("Previews upgrading a theme by uploaded file (dry-run)")
+    public ThemePreviewDTO previewUpdateThemeByUpload(@PathVariable("themeId") String themeId,
+        @RequestPart("file") MultipartFile file) {
+        return themeService.previewUpdateByUpload(themeId, file);
+    }
+
+    @PostMapping("fetching/preview")
+    @ApiOperation("Previews fetching and installing a new theme (dry-run)")
+    public ThemePreviewDTO previewFetchTheme(@RequestParam("uri") String uri) {
+        return themeService.previewByFetching(uri);
+    }
+
+    @PutMapping("fetching/{themeId:.+}/preview")
+    @ApiOperation("Previews upgrading a theme from remote (dry-run)")
+    public ThemePreviewDTO previewUpdateThemeByFetching(@PathVariable("themeId") String themeId) {
+        return themeService.previewUpdateByFetching(themeId);
     }
 
     @PostMapping("reload")
