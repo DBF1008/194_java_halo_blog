@@ -18,6 +18,7 @@ import run.halo.app.model.entity.Post;
 import run.halo.app.model.vo.PostListVO;
 import run.halo.app.service.OptionService;
 import run.halo.app.service.PostService;
+import run.halo.app.service.SearchService;
 import run.halo.app.service.ThemeService;
 
 /**
@@ -36,11 +37,14 @@ public class ContentSearchController {
 
     private final ThemeService themeService;
 
+    private final SearchService searchService;
+
     public ContentSearchController(PostService postService, OptionService optionService,
-        ThemeService themeService) {
+        ThemeService themeService, SearchService searchService) {
         this.postService = postService;
         this.optionService = optionService;
         this.themeService = themeService;
+        this.searchService = searchService;
     }
 
     /**
@@ -76,6 +80,8 @@ public class ContentSearchController {
         model.addAttribute("is_search", true);
         model.addAttribute("keyword", keyword);
         model.addAttribute("posts", posts);
+        // Unified posts and sheets results; legacy "posts" attribute kept for compatibility.
+        model.addAttribute("search_results", searchService.search(keyword, pageable));
         model.addAttribute("meta_keywords", optionService.getSeoKeywords());
         model.addAttribute("meta_description", optionService.getSeoDescription());
         return themeService.render("search");

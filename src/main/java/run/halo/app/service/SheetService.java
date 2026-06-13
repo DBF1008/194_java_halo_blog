@@ -3,6 +3,7 @@ package run.halo.app.service;
 import java.util.List;
 import java.util.Set;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
 import run.halo.app.model.dto.IndependentSheetDTO;
 import run.halo.app.model.entity.Sheet;
@@ -60,6 +61,16 @@ public interface SheetService extends BasePostService<Sheet> {
      * @return updated sheet
      */
     Sheet updateBy(@NonNull Sheet sheet, Set<SheetMeta> metas, boolean autoSave);
+
+    /**
+     * Pages published sheets by keyword.
+     *
+     * @param keyword keyword must not be null
+     * @param pageable page info must not be null
+     * @return a page of published sheets matching the keyword
+     */
+    @NonNull
+    Page<Sheet> pageBy(@NonNull String keyword, @NonNull Pageable pageable);
 
     /**
      * Gets by url

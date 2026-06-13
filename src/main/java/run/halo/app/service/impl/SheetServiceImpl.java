@@ -4,16 +4,19 @@ import static run.halo.app.model.support.HaloConst.URL_SEPARATOR;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.persistence.criteria.Predicate;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -149,6 +152,15 @@ public class SheetServiceImpl extends BasePostServiceImpl<Sheet> implements Shee
         Assert.notNull(pageable, "Page info must not be null");
 
         return listAll(pageable);
+    }
+
+    @Override
+    public Page<Sheet> pageBy(String keyword, Pageable pageable) {
+        Assert.notNull(keyword, "keyword must not be null");
+        Assert.notNull(pageable, "Page info must not be null");
+
+        // Only published sheets are searchable, so drafts/intimate sheets are never exposed
+        return sheetRepository.findAll(buildSearchSpec(keyword, PostStatus.PUBLISHED), pageable);
     }
 
     @Override
@@ -388,6 +400,32 @@ public class SheetServiceImpl extends BasePostServiceImpl<Sheet> implements Shee
         }
 
         return fullPath.toString();
+    }
+
+    /**
+     * Builds a specification that matches sheets of the given status whose title or original
+     * content contains the keyword.
+     *
+     * @param keyword keyword to match
+     * @param status sheet status restriction
+     * @return a sheet specification
+     */
+    @NonNull
+    private Specification<Sheet> buildSearchSpec(@NonNull String keyword,
+        @NonNull PostStatus status) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new LinkedList<>();
+
+            predicates.add(criteriaBuilder.equal(root.get("status"), status));
+
+            String likeCondition = String.format("%%%s%%", StringUtils.strip(keyword));
+            Predicate titleLike = criteriaBuilder.like(root.get("title"), likeCondition);
+            Predicate contentLike =
+                criteriaBuilder.like(root.get("originalContent"), likeCondition);
+            predicates.add(criteriaBuilder.or(titleLike, contentLike));
+
+            return query.where(predicates.toArray(new Predicate[0])).getRestriction();
+        };
     }
 
 }
