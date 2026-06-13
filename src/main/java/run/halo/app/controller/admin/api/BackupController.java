@@ -28,6 +28,7 @@ import run.halo.app.annotation.DisableOnCondition;
 import run.halo.app.config.properties.HaloProperties;
 import run.halo.app.exception.NotFoundException;
 import run.halo.app.model.dto.BackupDTO;
+import run.halo.app.model.dto.BackupManifestDTO;
 import run.halo.app.model.dto.post.BasePostDetailDTO;
 import run.halo.app.model.params.PostMarkdownParam;
 import run.halo.app.service.BackupService;
@@ -76,6 +77,48 @@ public class BackupController {
             .getBackup(Paths.get(haloProperties.getBackupMarkdownDir(), filename), MARKDOWN)
             .orElseThrow(() ->
                 new NotFoundException("备份文件 " + filename + " 不存在或已删除！").setErrorData(filename));
+    }
+
+    @GetMapping("work-dir/preview")
+    @ApiOperation("Previews a work directory backup manifest")
+    public BackupManifestDTO previewWorkDirBackup(@RequestParam("filename") String filename) {
+        return backupService.previewBackup(
+            Paths.get(haloProperties.getBackupDir(), filename), WHOLE_SITE);
+    }
+
+    @GetMapping("data/preview")
+    @ApiOperation("Previews a data backup manifest")
+    public BackupManifestDTO previewDataBackup(@RequestParam("filename") String filename) {
+        return backupService.previewBackup(
+            Paths.get(haloProperties.getDataExportDir(), filename), JSON_DATA);
+    }
+
+    @GetMapping("markdown/preview")
+    @ApiOperation("Previews a markdown backup manifest")
+    public BackupManifestDTO previewMarkdownBackup(@RequestParam("filename") String filename) {
+        return backupService.previewBackup(
+            Paths.get(haloProperties.getBackupMarkdownDir(), filename), MARKDOWN);
+    }
+
+    @PostMapping("work-dir/preview")
+    @ApiOperation("Previews an uploaded work directory backup manifest")
+    public BackupManifestDTO previewUploadedWorkDirBackup(
+        @RequestPart("file") MultipartFile file) {
+        return backupService.previewUploadedBackup(file, WHOLE_SITE);
+    }
+
+    @PostMapping("data/preview")
+    @ApiOperation("Previews an uploaded data backup manifest")
+    public BackupManifestDTO previewUploadedDataBackup(
+        @RequestPart("file") MultipartFile file) {
+        return backupService.previewUploadedBackup(file, JSON_DATA);
+    }
+
+    @PostMapping("markdown/preview")
+    @ApiOperation("Previews an uploaded markdown backup manifest")
+    public BackupManifestDTO previewUploadedMarkdownBackup(
+        @RequestPart("file") MultipartFile file) {
+        return backupService.previewUploadedBackup(file, MARKDOWN);
     }
 
     @PostMapping("work-dir")

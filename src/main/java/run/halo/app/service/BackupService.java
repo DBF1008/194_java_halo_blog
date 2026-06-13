@@ -8,6 +8,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.lang.NonNull;
 import org.springframework.web.multipart.MultipartFile;
 import run.halo.app.model.dto.BackupDTO;
+import run.halo.app.model.dto.BackupManifestDTO;
 import run.halo.app.model.dto.post.BasePostDetailDTO;
 import run.halo.app.model.params.PostMarkdownParam;
 
@@ -55,6 +56,33 @@ public interface BackupService {
      */
     @NonNull
     Optional<BackupDTO> getBackup(@NonNull Path backupFileName, @NonNull BackupType type);
+
+    /**
+     * Builds a read-only manifest (dry-run preview) for a backup file already stored on the
+     * server.
+     *
+     * <p>This method never extracts the archive, writes to the database or modifies the work
+     * directory. It is safe to invoke before downloading or importing a backup.</p>
+     *
+     * @param backupFilePath path of the backup file must not be null
+     * @param type backup type must not be null
+     * @return manifest describing the backup content and its potential impact on the current site
+     */
+    @NonNull
+    BackupManifestDTO previewBackup(@NonNull Path backupFilePath, @NonNull BackupType type);
+
+    /**
+     * Builds a read-only manifest (dry-run preview) for an uploaded backup file.
+     *
+     * <p>The uploaded file is only analysed in memory; this method never persists the file,
+     * extracts the archive, writes to the database or modifies the work directory.</p>
+     *
+     * @param file uploaded backup file must not be null
+     * @param type backup type must not be null
+     * @return manifest describing the backup content and its potential impact on the current site
+     */
+    @NonNull
+    BackupManifestDTO previewUploadedBackup(@NonNull MultipartFile file, @NonNull BackupType type);
 
     /**
      * Deletes backup.

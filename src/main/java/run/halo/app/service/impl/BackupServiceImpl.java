@@ -14,6 +14,8 @@ import cn.hutool.core.util.IdUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -21,15 +23,23 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -43,10 +53,12 @@ import org.springframework.web.multipart.MultipartFile;
 import run.halo.app.config.properties.HaloProperties;
 import run.halo.app.event.options.OptionUpdatedEvent;
 import run.halo.app.event.theme.ThemeUpdatedEvent;
+import run.halo.app.exception.BadRequestException;
 import run.halo.app.exception.NotFoundException;
 import run.halo.app.exception.ServiceException;
 import run.halo.app.handler.file.FileHandler;
 import run.halo.app.model.dto.BackupDTO;
+import run.halo.app.model.dto.BackupManifestDTO;
 import run.halo.app.model.dto.post.BasePostDetailDTO;
 import run.halo.app.model.entity.Attachment;
 import run.halo.app.model.entity.Category;
@@ -119,6 +131,17 @@ public class BackupServiceImpl implements BackupService {
     private static final String DATA_EXPORT_BASE_URI = "/api/admin/backups/data";
 
     private static final String UPLOAD_SUB_DIR = "upload/";
+
+    private static final int CONFLICT_SAMPLE_LIMIT = 10;
+
+    /**
+     * Table names contained in a JSON data export, in export order.
+     */
+    private static final List<String> DATA_TABLE_KEYS = List.of(
+        "attachments", "categories", "comment_black_list", "journals", "journal_comments",
+        "links", "logs", "menus", "options", "photos", "posts", "post_categories",
+        "post_comments", "post_metas", "post_tags", "sheets", "sheet_comments", "sheet_metas",
+        "tags", "theme_settings", "user");
 
     private final AttachmentService attachmentService;
 
@@ -271,6 +294,79 @@ public class BackupServiceImpl implements BackupService {
 
         BackupDTO backupDto = buildBackupDto(type.getBaseUri(), backupFilePath);
         return Optional.of(backupDto);
+    }
+
+    @Override
+    public BackupManifestDTO previewBackup(Path backupFilePath, BackupType type) {
+        Assert.notNull(backupFilePath, "Backup file path must not be null");
+        Assert.notNull(type, "Backup type must not be null");
+
+        if (Files.notExists(backupFilePath)) {
+            throw new NotFoundException(
+                "备份文件 " + backupFilePath.getFileName() + " 不存在或已删除！")
+                .setErrorData(backupFilePath.getFileName().toString());
+        }
+
+        BackupManifestDTO manifest = new BackupManifestDTO();
+        manifest.setBackupType(type);
+        manifest.setFilename(backupFilePath.getFileName().toString());
+        manifest.setFromUpload(false);
+        try {
+            manifest.setFileSize(Files.size(backupFilePath));
+        } catch (IOException e) {
+            throw new ServiceException("Failed to access backup file " + backupFilePath, e);
+        }
+
+        if (type == BackupType.JSON_DATA) {
+            String content;
+            try {
+                content = new String(Files.readAllBytes(backupFilePath), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                throw new ServiceException("Failed to read backup file " + backupFilePath, e);
+            }
+            manifest.setData(buildDataManifest(content));
+        } else {
+            try (InputStream inputStream = Files.newInputStream(backupFilePath)) {
+                manifest.setArchive(buildArchiveManifest(inputStream, type));
+            } catch (IOException e) {
+                throw new ServiceException("Failed to read backup file " + backupFilePath, e);
+            }
+        }
+
+        populateWarnings(manifest);
+        return manifest;
+    }
+
+    @Override
+    public BackupManifestDTO previewUploadedBackup(MultipartFile file, BackupType type) {
+        Assert.notNull(file, "Upload file must not be null");
+        Assert.notNull(type, "Backup type must not be null");
+
+        if (file.isEmpty()) {
+            throw new BadRequestException("上传的备份文件为空");
+        }
+
+        BackupManifestDTO manifest = new BackupManifestDTO();
+        manifest.setBackupType(type);
+        manifest.setFilename(file.getOriginalFilename());
+        manifest.setFileSize(file.getSize());
+        manifest.setFromUpload(true);
+
+        try {
+            if (type == BackupType.JSON_DATA) {
+                String content = IoUtil.read(file.getInputStream(), StandardCharsets.UTF_8);
+                manifest.setData(buildDataManifest(content));
+            } else {
+                try (InputStream inputStream = file.getInputStream()) {
+                    manifest.setArchive(buildArchiveManifest(inputStream, type));
+                }
+            }
+        } catch (IOException e) {
+            throw new ServiceException("Failed to read uploaded backup file", e);
+        }
+
+        populateWarnings(manifest);
+        return manifest;
     }
 
     @Override
@@ -688,6 +784,276 @@ public class BackupServiceImpl implements BackupService {
             + "?"
             + HaloConst.ONE_TIME_TOKEN_QUERY_NAME
             + "=" + oneTimeToken;
+    }
+
+    /**
+     * Builds a manifest of a JSON data backup by parsing the content in memory. No database write
+     * nor work directory modification happens here.
+     *
+     * @param jsonContent raw json content of the data backup
+     * @return data manifest
+     */
+    private BackupManifestDTO.DataManifest buildDataManifest(String jsonContent) {
+        Map<String, Object> data;
+        try {
+            data = JsonUtils.DEFAULT_JSON_MAPPER
+                .readValue(jsonContent, new TypeReference<HashMap<String, Object>>() {
+                });
+        } catch (IOException e) {
+            throw new BadRequestException("非法的备份文件：无法解析 JSON 数据", e);
+        }
+        if (data == null) {
+            throw new BadRequestException("非法的备份文件：JSON 数据为空");
+        }
+
+        BackupManifestDTO.DataManifest manifest = new BackupManifestDTO.DataManifest();
+        manifest.setVersion(asString(data.get("version")));
+        manifest.setExportDate(asString(data.get("export_date")));
+
+        Map<String, Integer> counts = manifest.getContentCounts();
+        for (String key : DATA_TABLE_KEYS) {
+            counts.put(key, sizeOf(data.get(key)));
+        }
+
+        for (Map.Entry<String, Supplier<List<?>>> entry : conflictSources().entrySet()) {
+            String table = entry.getKey();
+            List<Map<String, Object>> rows = rowsOf(data.get(table));
+            if (rows.isEmpty()) {
+                continue;
+            }
+            Set<String> backupIds = idsFromRows(rows);
+            Set<String> existingIds = idsFromEntities(entry.getValue().get());
+
+            BackupManifestDTO.TableConflict conflict = new BackupManifestDTO.TableConflict(table);
+            conflict.setBackupCount(rows.size());
+            conflict.setExistingCount(existingIds.size());
+
+            Set<String> conflictIds = new LinkedHashSet<>(backupIds);
+            conflictIds.retainAll(existingIds);
+            conflict.setConflictCount(conflictIds.size());
+            conflict.setSampleConflictIds(conflictIds.stream()
+                .limit(CONFLICT_SAMPLE_LIMIT)
+                .collect(Collectors.toList()));
+            manifest.getConflicts().add(conflict);
+        }
+
+        List<Map<String, Object>> optionRows = rowsOf(data.get("options"));
+        if (!optionRows.isEmpty()) {
+            Set<String> backupKeys = optionRows.stream()
+                .map(row -> asString(row.get("key")))
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+            Set<String> existingKeys = optionService.listAll().stream()
+                .map(Option::getKey)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+            backupKeys.retainAll(existingKeys);
+            manifest.setConflictingOptionKeys(new ArrayList<>(backupKeys));
+        }
+
+        boolean backupHasUser = !rowsOf(data.get("user")).isEmpty();
+        manifest.setUserConflict(backupHasUser && !userService.listAll().isEmpty());
+
+        return manifest;
+    }
+
+    /**
+     * Builds a manifest of an archive backup by streaming its entries. The archive is never
+     * extracted and the work directory is never touched.
+     *
+     * @param inputStream archive input stream
+     * @param type backup type
+     * @return archive manifest
+     */
+    private BackupManifestDTO.ArchiveManifest buildArchiveManifest(InputStream inputStream,
+        BackupType type) {
+        BackupManifestDTO.ArchiveManifest manifest = new BackupManifestDTO.ArchiveManifest();
+        Set<String> topLevelEntries = new LinkedHashSet<>();
+        int markdownCount = 0;
+        int uploadFileCount = 0;
+        boolean containsUpload = false;
+
+        try (ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
+            ZipEntry entry = zipInputStream.getNextEntry();
+            if (entry == null) {
+                throw new BadRequestException("非法的备份文件：不是有效的 ZIP 压缩包或压缩包为空");
+            }
+            while (entry != null) {
+                manifest.setTotalEntries(manifest.getTotalEntries() + 1);
+
+                String name = normalizeEntryName(entry.getName());
+                String topSegment = topSegment(name);
+                if (StringUtils.isNotBlank(topSegment)) {
+                    topLevelEntries.add(topSegment);
+                }
+                boolean uploadEntry = "upload".equalsIgnoreCase(topSegment);
+                if (uploadEntry) {
+                    containsUpload = true;
+                }
+
+                if (entry.isDirectory()) {
+                    manifest.setDirectoryCount(manifest.getDirectoryCount() + 1);
+                } else {
+                    manifest.setFileCount(manifest.getFileCount() + 1);
+                    if (StringUtils.endsWithIgnoreCase(name, ".md")) {
+                        markdownCount++;
+                    }
+                    if (uploadEntry) {
+                        uploadFileCount++;
+                    }
+                }
+
+                zipInputStream.closeEntry();
+                entry = zipInputStream.getNextEntry();
+            }
+        } catch (ZipException e) {
+            throw new BadRequestException("非法的备份文件：不是有效的 ZIP 压缩包", e);
+        } catch (IOException e) {
+            throw new ServiceException("Failed to read backup archive", e);
+        }
+
+        manifest.setTopLevelEntries(new ArrayList<>(topLevelEntries));
+        if (type == BackupType.MARKDOWN) {
+            manifest.setMarkdownCount(markdownCount);
+            manifest.setContainsUpload(containsUpload);
+            manifest.setUploadFileCount(uploadFileCount);
+        }
+        return manifest;
+    }
+
+    /**
+     * Maps core content table names to a supplier returning the records currently stored on the
+     * site. Only read operations ({@code listAll}) are referenced, so calling the suppliers never
+     * mutates any data.
+     *
+     * @return ordered map of table name to existing-record supplier
+     */
+    private Map<String, Supplier<List<?>>> conflictSources() {
+        Map<String, Supplier<List<?>>> sources = new LinkedHashMap<>();
+        sources.put("posts", postService::listAll);
+        sources.put("sheets", sheetService::listAll);
+        sources.put("post_comments", postCommentService::listAll);
+        sources.put("sheet_comments", sheetCommentService::listAll);
+        sources.put("journal_comments", journalCommentService::listAll);
+        sources.put("attachments", attachmentService::listAll);
+        sources.put("categories", categoryService::listAll);
+        sources.put("tags", tagService::listAll);
+        sources.put("menus", menuService::listAll);
+        sources.put("links", linkService::listAll);
+        sources.put("photos", photoService::listAll);
+        sources.put("journals", journalService::listAll);
+        sources.put("theme_settings", themeSettingService::listAll);
+        sources.put("options", optionService::listAll);
+        return sources;
+    }
+
+    private void populateWarnings(BackupManifestDTO manifest) {
+        List<String> warnings = manifest.getWarnings();
+
+        BackupManifestDTO.DataManifest data = manifest.getData();
+        if (data != null) {
+            int totalConflicts = data.getConflicts().stream()
+                .mapToInt(BackupManifestDTO.TableConflict::getConflictCount)
+                .sum();
+            if (totalConflicts > 0) {
+                warnings.add("检测到 " + totalConflicts
+                    + " 处主键冲突，导入时这些记录可能与现有数据冲突。");
+            }
+            if (!data.getConflictingOptionKeys().isEmpty()) {
+                warnings.add("检测到 " + data.getConflictingOptionKeys().size()
+                    + " 个选项键已存在，导入会重复写入并可能覆盖站点关键配置。");
+            }
+            if (data.isUserConflict()) {
+                warnings.add("当前站点已存在用户，导入备份中的用户可能失败或产生冲突。");
+            }
+            warnings.add("导入数据为追加写入，不会自动清空现有数据。");
+        }
+
+        BackupManifestDTO.ArchiveManifest archive = manifest.getArchive();
+        if (archive != null && manifest.getBackupType() == BackupType.MARKDOWN) {
+            if (Boolean.TRUE.equals(archive.getContainsUpload())) {
+                int uploadFiles = Optional.ofNullable(archive.getUploadFileCount()).orElse(0);
+                warnings.add("该 Markdown 备份包含 upload 附件目录（" + uploadFiles + " 个文件）。");
+            } else {
+                warnings.add("该 Markdown 备份不包含 upload 附件目录，导入后附件可能丢失。");
+            }
+        }
+    }
+
+    private static int sizeOf(Object value) {
+        return value instanceof Collection ? ((Collection<?>) value).size() : 0;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> rowsOf(Object value) {
+        if (!(value instanceof Collection)) {
+            return Collections.emptyList();
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Object item : (Collection<?>) value) {
+            if (item instanceof Map) {
+                rows.add((Map<String, Object>) item);
+            }
+        }
+        return rows;
+    }
+
+    private static Set<String> idsFromRows(List<Map<String, Object>> rows) {
+        Set<String> ids = new LinkedHashSet<>();
+        for (Map<String, Object> row : rows) {
+            String id = asString(row.get("id"));
+            if (StringUtils.isNotBlank(id)) {
+                ids.add(id);
+            }
+        }
+        return ids;
+    }
+
+    private static Set<String> idsFromEntities(List<?> entities) {
+        Set<String> ids = new LinkedHashSet<>();
+        for (Object entity : entities) {
+            String id = invokeGetId(entity);
+            if (StringUtils.isNotBlank(id)) {
+                ids.add(id);
+            }
+        }
+        return ids;
+    }
+
+    private static String invokeGetId(Object entity) {
+        if (entity == null) {
+            return null;
+        }
+        try {
+            Method method = entity.getClass().getMethod("getId");
+            Object id = method.invoke(entity);
+            return id == null ? null : String.valueOf(id);
+        } catch (ReflectiveOperationException e) {
+            return null;
+        }
+    }
+
+    private static String asString(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static String normalizeEntryName(String name) {
+        if (name == null) {
+            return "";
+        }
+        String normalized = name.replace('\\', '/');
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        return normalized;
+    }
+
+    private static String topSegment(String normalizedName) {
+        if (StringUtils.isBlank(normalizedName)) {
+            return "";
+        }
+        int slashIndex = normalizedName.indexOf('/');
+        return slashIndex >= 0 ? normalizedName.substring(0, slashIndex) : normalizedName;
     }
 
 }
