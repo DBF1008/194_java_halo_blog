@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -41,8 +42,12 @@ import run.halo.app.exception.ThemeUpdateException;
 import run.halo.app.handler.theme.config.ThemeConfigResolver;
 import run.halo.app.handler.theme.config.support.Group;
 import run.halo.app.handler.theme.config.support.ThemeProperty;
+import run.halo.app.model.support.ConfigDiffEntry;
+import run.halo.app.model.support.FileDiffEntry;
 import run.halo.app.model.support.HaloConst;
 import run.halo.app.model.support.ThemeFile;
+import run.halo.app.model.support.ThemeInstallDryRunResult;
+import run.halo.app.model.support.ThemeUpgradeDryRunResult;
 import run.halo.app.repository.ThemeRepository;
 import run.halo.app.repository.ThemeSettingRepository;
 import run.halo.app.service.ThemeService;
@@ -50,7 +55,9 @@ import run.halo.app.theme.GitThemeFetcher;
 import run.halo.app.theme.GitThemeUpdater;
 import run.halo.app.theme.MultipartFileThemeUpdater;
 import run.halo.app.theme.MultipartZipFileThemeFetcher;
+import run.halo.app.theme.ThemeConfigComparator;
 import run.halo.app.theme.ThemeFetcherComposite;
+import run.halo.app.theme.ThemeFileComparator;
 import run.halo.app.theme.ThemeFileScanner;
 import run.halo.app.theme.ThemePropertyScanner;
 import run.halo.app.theme.ZipThemeFetcher;
@@ -286,29 +293,7 @@ public class ThemeServiceImpl implements ThemeService {
             return Collections.emptyList();
         }
 
-        try {
-            for (String optionsName : SETTINGS_NAMES) {
-                // Resolve the options path
-                Path optionsPath = Paths.get(themeProperty.getThemePath(), optionsName);
-
-                log.debug("Finding options in: [{}]", optionsPath.toString());
-
-                // Check existence
-                if (!Files.exists(optionsPath)) {
-                    continue;
-                }
-
-                // Read the yaml file
-                String optionContent = Files.readString(optionsPath);
-
-                // Resolve it
-                return themeConfigResolver.resolve(optionContent);
-            }
-
-            return Collections.emptyList();
-        } catch (IOException e) {
-            throw new ServiceException("读取主题配置文件失败", e);
-        }
+        return resolveConfigFromPath(themeProperty.getThemePath());
     }
 
     @Override
@@ -564,6 +549,173 @@ public class ThemeServiceImpl implements ThemeService {
             return themeUpdater.update(themeId);
         } catch (IOException e) {
             throw new ServiceException("更新主题失败：" + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @NonNull
+    public ThemeInstallDryRunResult dryRunFetch(@NonNull String uri) {
+        Assert.hasText(uri, "Theme remote uri must not be blank");
+
+        final var themeProperty = fetcherComposite.fetch(uri);
+        return buildInstallDryRunResult(themeProperty);
+    }
+
+    @Override
+    @NonNull
+    public ThemeInstallDryRunResult dryRunUpload(@NonNull MultipartFile file) {
+        Assert.notNull(file, "Multipart file must not be null");
+
+        final var themeProperty = fetcherComposite.fetch(file);
+        return buildInstallDryRunResult(themeProperty);
+    }
+
+    @Override
+    @NonNull
+    public ThemeUpgradeDryRunResult dryRunUpdate(@NonNull String themeId) {
+        Assert.hasText(themeId, "Theme id must not be blank");
+
+        final var oldTheme = themeRepository.fetchThemePropertyByThemeId(themeId)
+            .orElseThrow(() -> new NotFoundException(
+                "主题 " + themeId + " 不存在或以删除！").setErrorData(themeId));
+
+        final var gitRepo = oldTheme.getRepo();
+        Assert.hasText(gitRepo, "Theme repo must not be blank for dry-run update");
+
+        final var newTheme = fetcherComposite.fetch(gitRepo);
+        return buildUpgradeDryRunResult(themeId, oldTheme, newTheme);
+    }
+
+    @Override
+    @NonNull
+    public ThemeUpgradeDryRunResult dryRunUpdate(@NonNull String themeId,
+            @NonNull MultipartFile file) {
+        Assert.hasText(themeId, "Theme id must not be blank");
+        Assert.notNull(file, "Multipart file must not be null");
+
+        final var oldTheme = themeRepository.fetchThemePropertyByThemeId(themeId)
+            .orElseThrow(() -> new NotFoundException(
+                "主题 ID 为 " + themeId + " 不存在或已删除！").setErrorData(themeId));
+
+        final var newTheme = fetcherComposite.fetch(file);
+
+        // Validate theme IDs match
+        if (!Objects.equals(oldTheme.getId(), newTheme.getId())) {
+            final var tempPath = Paths.get(newTheme.getThemePath());
+            deleteFolderQuietly(tempPath);
+            throw new BadRequestException("上传的主题 " + newTheme.getId()
+                + " 和当前主题的 " + oldTheme.getId() + " 不一致，无法进行更新操作！");
+        }
+
+        return buildUpgradeDryRunResult(themeId, oldTheme, newTheme);
+    }
+
+    /**
+     * Builds a dry-run install result from a fetched theme property.
+     * Cleans up the temporary directory in a finally block.
+     */
+    @NonNull
+    private ThemeInstallDryRunResult buildInstallDryRunResult(
+            @NonNull ThemeProperty themeProperty) {
+        final var tempPath = Paths.get(themeProperty.getThemePath());
+        try {
+            var result = new ThemeInstallDryRunResult();
+            result.setThemeProperty(themeProperty);
+
+            // Check if theme already exists
+            result.setAlreadyExists(
+                themeRepository.fetchThemePropertyByThemeId(themeProperty.getId()).isPresent());
+
+            // Check version compatibility
+            boolean incompatible = themeRepository.checkThemePropertyCompatibility(themeProperty);
+            result.setVersionCompatible(!incompatible);
+            result.setRequiredHaloVersion(themeProperty.getRequire());
+            result.setCurrentHaloVersion(HaloConst.HALO_VERSION);
+
+            // Parse configuration from settings.yaml
+            result.setConfigGroups(resolveConfigFromPath(themeProperty.getThemePath()));
+
+            // Scan file tree
+            result.setThemeFiles(
+                ThemeFileScanner.INSTANCE.scan(themeProperty.getThemePath()));
+
+            return result;
+        } finally {
+            deleteFolderQuietly(tempPath);
+        }
+    }
+
+    /**
+     * Builds a dry-run upgrade result by comparing old and new themes.
+     * Cleans up the new theme's temporary directory in a finally block.
+     */
+    @NonNull
+    private ThemeUpgradeDryRunResult buildUpgradeDryRunResult(@NonNull String themeId,
+            @NonNull ThemeProperty oldTheme, @NonNull ThemeProperty newTheme) {
+        final var newTempPath = Paths.get(newTheme.getThemePath());
+        try {
+            var result = new ThemeUpgradeDryRunResult();
+            result.setCurrentTheme(oldTheme);
+            result.setNewTheme(newTheme);
+
+            // Check version compatibility
+            boolean incompatible = themeRepository.checkThemePropertyCompatibility(newTheme);
+            result.setVersionCompatible(!incompatible);
+
+            // Check if this affects the activated theme
+            result.setAffectsActivatedTheme(
+                themeId.equals(themeRepository.getActivatedThemeId()));
+
+            // Compare files
+            try {
+                Path oldPath = Paths.get(oldTheme.getThemePath());
+                Path newPath = Paths.get(newTheme.getThemePath());
+                List<FileDiffEntry> fileDiffs =
+                    ThemeFileComparator.compare(oldPath, newPath);
+                result.setFileDiffs(fileDiffs);
+                result.setHasFileChanges(fileDiffs.stream()
+                    .anyMatch(d -> d.getDiffType() != FileDiffEntry.DiffType.UNCHANGED));
+            } catch (IOException e) {
+                throw new ServiceException("预检文件对比失败", e);
+            }
+
+            // Compare configuration
+            List<Group> oldConfig = resolveConfigFromPath(oldTheme.getThemePath());
+            List<Group> newConfig = resolveConfigFromPath(newTheme.getThemePath());
+            List<ConfigDiffEntry> configDiffs =
+                ThemeConfigComparator.compare(oldConfig, newConfig);
+            result.setConfigDiffs(configDiffs);
+            result.setHasConfigChanges(configDiffs.stream()
+                .anyMatch(d -> d.getDiffType() != ConfigDiffEntry.ConfigDiffType.UNCHANGED));
+
+            return result;
+        } finally {
+            deleteFolderQuietly(newTempPath);
+        }
+    }
+
+    /**
+     * Resolves theme configuration groups from the given theme path.
+     * Iterates through known settings file names and parses the first one found.
+     *
+     * @param themePath the theme root directory path
+     * @return list of configuration groups, or empty list if no settings file found
+     */
+    @NonNull
+    private List<Group> resolveConfigFromPath(@NonNull String themePath) {
+        try {
+            for (String optionsName : SETTINGS_NAMES) {
+                Path optionsPath = Paths.get(themePath, optionsName);
+                if (!Files.exists(optionsPath)) {
+                    continue;
+                }
+                String optionContent = Files.readString(optionsPath);
+                return themeConfigResolver.resolve(optionContent);
+            }
+            return Collections.emptyList();
+        } catch (IOException e) {
+            log.warn("Failed to resolve theme config from path: {}", themePath, e);
+            return Collections.emptyList();
         }
     }
 

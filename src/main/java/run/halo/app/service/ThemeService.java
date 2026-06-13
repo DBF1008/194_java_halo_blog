@@ -10,6 +10,8 @@ import org.springframework.web.multipart.MultipartFile;
 import run.halo.app.handler.theme.config.support.Group;
 import run.halo.app.handler.theme.config.support.ThemeProperty;
 import run.halo.app.model.support.ThemeFile;
+import run.halo.app.model.support.ThemeInstallDryRunResult;
+import run.halo.app.model.support.ThemeUpgradeDryRunResult;
 
 /**
  * Theme service interface.
@@ -390,4 +392,54 @@ public interface ThemeService {
      * @return theme info
      */
     ThemeProperty update(@NonNull String themeId, @NonNull MultipartFile file);
+
+    /**
+     * Dry-run preview for theme installation from a remote URI (zip or git).
+     *
+     * <p>Fetches the theme to a temporary directory and collects preview information
+     * without writing to the theme directory or modifying the database.</p>
+     *
+     * @param uri the remote URI (zip URL or git repository URL)
+     * @return dry-run result with theme metadata, compatibility check, and file listing
+     */
+    @NonNull
+    ThemeInstallDryRunResult dryRunFetch(@NonNull String uri);
+
+    /**
+     * Dry-run preview for theme installation from an uploaded file.
+     *
+     * <p>Extracts the uploaded theme to a temporary directory and collects preview
+     * information without writing to the theme directory or modifying the database.</p>
+     *
+     * @param file the uploaded zip file
+     * @return dry-run result with theme metadata, compatibility check, and file listing
+     */
+    @NonNull
+    ThemeInstallDryRunResult dryRunUpload(@NonNull MultipartFile file);
+
+    /**
+     * Dry-run preview for theme upgrade from remote repository.
+     *
+     * <p>Fetches the latest theme version and compares it with the currently installed
+     * version, producing file and configuration diffs without modifying any files.</p>
+     *
+     * @param themeId the id of the theme to update
+     * @return dry-run result with file diffs and config diffs
+     */
+    @NonNull
+    ThemeUpgradeDryRunResult dryRunUpdate(@NonNull String themeId);
+
+    /**
+     * Dry-run preview for theme upgrade from an uploaded file.
+     *
+     * <p>Extracts the uploaded theme and compares it with the currently installed
+     * version, producing file and configuration diffs without modifying any files.</p>
+     *
+     * @param themeId the id of the theme to update
+     * @param file the uploaded zip file containing the new theme version
+     * @return dry-run result with file diffs and config diffs
+     */
+    @NonNull
+    ThemeUpgradeDryRunResult dryRunUpdate(@NonNull String themeId,
+        @NonNull MultipartFile file);
 }

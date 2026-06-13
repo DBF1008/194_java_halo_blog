@@ -22,6 +22,8 @@ import run.halo.app.handler.theme.config.support.ThemeProperty;
 import run.halo.app.model.params.ThemeContentParam;
 import run.halo.app.model.support.BaseResponse;
 import run.halo.app.model.support.ThemeFile;
+import run.halo.app.model.support.ThemeInstallDryRunResult;
+import run.halo.app.model.support.ThemeUpgradeDryRunResult;
 import run.halo.app.service.ThemeService;
 import run.halo.app.service.ThemeSettingService;
 
@@ -243,5 +245,32 @@ public class ThemeController {
     @ApiOperation("Determines if template exists")
     public BaseResponse<Boolean> exists(@RequestParam(value = "template") String template) {
         return BaseResponse.ok(themeService.templateExists(template));
+    }
+
+    @PostMapping("dry-run/fetching")
+    @ApiOperation("Dry-run preview for theme installation from remote URI")
+    public ThemeInstallDryRunResult dryRunFetchTheme(@RequestParam("uri") String uri) {
+        return themeService.dryRunFetch(uri);
+    }
+
+    @PostMapping("dry-run/upload")
+    @ApiOperation("Dry-run preview for theme installation from uploaded file")
+    public ThemeInstallDryRunResult dryRunUploadTheme(@RequestPart("file") MultipartFile file) {
+        return themeService.dryRunUpload(file);
+    }
+
+    @PostMapping("dry-run/fetching/{themeId:.+}")
+    @ApiOperation("Dry-run preview for theme upgrade from remote repository")
+    public ThemeUpgradeDryRunResult dryRunUpdateThemeByFetching(
+            @PathVariable("themeId") String themeId) {
+        return themeService.dryRunUpdate(themeId);
+    }
+
+    @PostMapping("dry-run/upload/{themeId:.+}")
+    @ApiOperation("Dry-run preview for theme upgrade from uploaded file")
+    public ThemeUpgradeDryRunResult dryRunUpdateThemeByUpload(
+            @PathVariable("themeId") String themeId,
+            @RequestPart("file") MultipartFile file) {
+        return themeService.dryRunUpdate(themeId, file);
     }
 }
